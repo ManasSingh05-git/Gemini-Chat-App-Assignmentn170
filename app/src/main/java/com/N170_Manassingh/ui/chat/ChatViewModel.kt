@@ -9,6 +9,7 @@ import com.N170_Manassingh.data.local.ChatMessageEntity
 import com.N170_Manassingh.data.local.UserPreferencesRepository
 import com.N170_Manassingh.data.repository.ChatRepository
 import com.N170_Manassingh.security.ApiKeyManager
+import com.N170_Manassingh.voice.TTSManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +21,8 @@ class ChatViewModel(
     private val geminiRepository: GeminiRepository,
     private val chatRepository: ChatRepository,
     private val apiKeyManager: ApiKeyManager,
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val userPreferencesRepository: UserPreferencesRepository,
+    private val ttsManager: TTSManager? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -50,10 +52,6 @@ class ChatViewModel(
         _uiState.update { it.copy(prompt = value, promptError = null) }
     }
 
-    fun setSpeechRecognizing(isRecognizing: Boolean) {
-        _uiState.update { it.copy(isRecognizingSpeech = isRecognizing) }
-    }
-
     fun onSpeechResult(spokenText: String) {
         _uiState.update { 
             it.copy(
@@ -62,6 +60,18 @@ class ChatViewModel(
                 isRecognizingSpeech = false
             ) 
         }
+    }
+    
+    fun toggleMute() {
+        val newMutedState = !_uiState.value.isMuted
+        _uiState.update { it.copy(isMuted = newMutedState) }
+        if (newMutedState) {
+            ttsManager?.stop() // Stop speaking immediately if muted
+        }
+    }
+
+    fun stopSpeaking() {
+        ttsManager?.stop()
     }
 
     fun clearHistory() {
@@ -84,6 +94,9 @@ class ChatViewModel(
         }
         
         if (_uiState.value.isLoading) return
+
+        // Stop any ongoing speech when a new prompt is sent
+        ttsManager?.stop()
 
         _uiState.update { it.copy(isLoading = true, errorMessage = null, promptError = null, prompt = "") }
         
@@ -114,6 +127,11 @@ class ChatViewModel(
                         )
                     )
                     _uiState.update { it.copy(isLoading = false) }
+                    
+                    // Speak the response if not muted
+                    if (!_uiState.value.isMuted) {
+                        ttsManager?.speak(text)
+                    }
                 },
                 onFailure = { error ->
                     _uiState.update {
@@ -139,6 +157,11 @@ class ChatViewModel(
     fun clearErrorMessage() {
         _uiState.update { it.copy(errorMessage = null) }
     }
+    
+    override fun onCleared() {
+        super.onCleared()
+        ttsManager?.shutdown()
+    }
 
     companion object {
         const val MISSING_API_KEY_MESSAGE =
@@ -148,11 +171,12 @@ class ChatViewModel(
             geminiRepository: GeminiRepository, 
             chatRepository: ChatRepository,
             apiKeyManager: ApiKeyManager,
-            userPreferencesRepository: UserPreferencesRepository
+            userPreferencesRepository: UserPreferencesRepository,
+            ttsManager: TTSManager? = null
         ) = object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    ChatViewModel(geminiRepository, chatRepository, apiKeyManager, userPreferencesRepository) as T
+                    ChatViewModel(geminiRepository, chatRepository, apiKeyManager, userPreferencesRepository, ttsManager) as T
             }
     }
 }

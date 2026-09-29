@@ -19,6 +19,7 @@ import com.N170_Manassingh.security.KeystoreManager
 import com.N170_Manassingh.ui.chat.ChatRoute
 import com.N170_Manassingh.ui.chat.ChatViewModel
 import com.N170_Manassingh.ui.theme.GeminiApiComposeStarterTheme
+import com.N170_Manassingh.voice.TTSManager
 
 class MainActivity : ComponentActivity() {
 
@@ -34,13 +35,17 @@ class MainActivity : ComponentActivity() {
     private val chatDatabase by lazy { ChatDatabase.getDatabase(applicationContext) }
     private val chatRepository by lazy { ChatRepository(chatDatabase.chatDao()) }
     private val geminiRepository by lazy { GeminiRepositoryImpl() }
+    
+    // Initialize TTS Engine
+    private val ttsManager by lazy { TTSManager(applicationContext) }
 
     private val viewModel: ChatViewModel by viewModels {
         ChatViewModel.factory(
             geminiRepository = geminiRepository,
             chatRepository = chatRepository,
             apiKeyManager = apiKeyManager,
-            userPreferencesRepository = userPreferencesRepository
+            userPreferencesRepository = userPreferencesRepository,
+            ttsManager = ttsManager
         )
     }
 

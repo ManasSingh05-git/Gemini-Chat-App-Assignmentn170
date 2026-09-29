@@ -1,6 +1,7 @@
 package com.N170_Manassingh.data
 
 import android.util.Log
+import com.google.ai.client.generativeai.Chat
 import com.google.ai.client.generativeai.GenerativeModel
 import kotlinx.coroutines.CancellationException
 
@@ -12,16 +13,18 @@ class GeminiRepositoryImpl(
 ) : GeminiRepository {
 
     private var model: GenerativeModel? = null
+    private var chatSession: Chat? = null
 
     override suspend fun initialize(apiKey: String) {
         if (apiKey.isNotBlank()) {
             model = GenerativeModel(modelName = modelName, apiKey = apiKey)
+            chatSession = model?.startChat()
         }
     }
 
     override suspend fun generateText(prompt: String): Result<String> = try {
-        val generativeModel = model ?: throw IllegalStateException("Gemini model not initialized with API key")
-        val response = generativeModel.generateContent(prompt)
+        val chat = chatSession ?: throw IllegalStateException("Gemini chat session not initialized with API key")
+        val response = chat.sendMessage(prompt)
         val text = response.text?.takeIf { it.isNotBlank() }
         if (text != null) {
             Result.success(text)
@@ -31,7 +34,7 @@ class GeminiRepositoryImpl(
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        Log.e(TAG, "generateContent failed", e)
+        Log.e(TAG, "sendMessage failed", e)
         Result.failure(e)
     }
 }
