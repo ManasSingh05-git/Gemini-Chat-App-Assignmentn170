@@ -1,0 +1,5 @@
+# Example local.properties file for GeminiApiComposeStarter
+# Copy this file to local.properties and add your real Gemini API Key.
+# DO NOT commit local.properties containing real credentials to Git!
+
+GEMINI_API_KEY=your_api_key_here
