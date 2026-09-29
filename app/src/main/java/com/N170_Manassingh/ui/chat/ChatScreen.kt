@@ -18,6 +18,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
@@ -58,7 +60,9 @@ fun ChatRoute(viewModel: ChatViewModel, windowSizeClass: WindowSizeClass) {
         onSend = viewModel::onSend,
         onClearHistory = viewModel::clearHistory,
         onSpeechRecognized = viewModel::onSpeechResult,
-        onClearError = viewModel::clearErrorMessage
+        onClearError = viewModel::clearErrorMessage,
+        onToggleMute = viewModel::toggleMute,
+        onMicClicked = { viewModel.stopSpeaking() } // Interrupt TTS when typing/speaking starts
     )
 }
 
@@ -71,7 +75,9 @@ fun ChatScreen(
     onSend: () -> Unit,
     onClearHistory: () -> Unit,
     onSpeechRecognized: (String) -> Unit,
-    onClearError: () -> Unit
+    onClearError: () -> Unit,
+    onToggleMute: () -> Unit,
+    onMicClicked: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     
@@ -97,6 +103,13 @@ fun ChatScreen(
                     ) 
                 },
                 actions = {
+                    IconButton(onClick = onToggleMute) {
+                        Icon(
+                            imageVector = if (state.isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                            contentDescription = if (state.isMuted) "Unmute" else "Mute",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     IconButton(onClick = onClearHistory) {
                         Icon(
                             imageVector = Icons.Default.Delete, 
@@ -129,9 +142,13 @@ fun ChatScreen(
                     prompt = state.prompt,
                     promptError = state.promptError,
                     enabled = !state.isLoading,
-                    onPromptChange = onPromptChange,
+                    onPromptChange = {
+                        onMicClicked() // Interrupt AI speech if user starts typing
+                        onPromptChange(it)
+                    },
                     onSend = onSend,
-                    onSpeechRecognized = onSpeechRecognized
+                    onSpeechRecognized = onSpeechRecognized,
+                    onMicClicked = onMicClicked
                 )
             }
             if (state.isLoading) {
@@ -320,7 +337,8 @@ private fun PromptBar(
     enabled: Boolean,
     onPromptChange: (String) -> Unit,
     onSend: () -> Unit,
-    onSpeechRecognized: (String) -> Unit
+    onSpeechRecognized: (String) -> Unit,
+    onMicClicked: () -> Unit
 ) {
     val speechRecognizerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -341,6 +359,7 @@ private fun PromptBar(
     ) {
         IconButton(
             onClick = {
+                onMicClicked() // Interrupt TTS before listening
                 val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
